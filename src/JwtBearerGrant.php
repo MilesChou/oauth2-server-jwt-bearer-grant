@@ -15,11 +15,17 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 class JwtBearerGrant extends AbstractGrant
 {
+    /**
+     * @var string|null
+     */
     private $publicKey;
 
-    public function __construct($publicKey)
+    /**
+     * @param string|null $publicKey
+     */
+    public function __construct($publicKey = null)
     {
-        $this->publicKey = $publicKey;
+        $this->setPublicKey($publicKey);
     }
 
     /**
@@ -54,6 +60,22 @@ class JwtBearerGrant extends AbstractGrant
         return $responseType;
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    public function getIdentifier()
+    {
+        return 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+    }
+
+    /**
+     * @param string $publicKey
+     */
+    public function setPublicKey($publicKey)
+    {
+        $this->publicKey = $publicKey;
+    }
+
     protected function validateAssertion(ServerRequestInterface $request)
     {
         // If the client is confidential require the client secret
@@ -67,13 +89,5 @@ class JwtBearerGrant extends AbstractGrant
         $jwt->verify(new Sha256(), $this->publicKey);
 
         return $jwt;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getIdentifier()
-    {
-        return 'urn:ietf:params:oauth:grant-type:jwt-bearer';
     }
 }
