@@ -1,0 +1,29 @@
+{
+    "name": "mileschout/oauth2-server-jwt-bearer-grant",
+    "description": "Implement RFC 7523 on league/oauth2-server.",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Miles Chou",
+            "email": "jangconan@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.6.0 <7.2"
+    },
+    "require-dev": {
+        "league/oauth2-server": "^6.0",
+        "phpunit/phpunit": "^5.7",
+        "zendframework/zend-diactoros": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "MilesChou\\OAuth2\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    }
+}
