@@ -1,0 +1,22 @@
+sudo: false
+os: linux
+dist: trusty
+language: php
+php:
+- 7.0
+- 7.1
+
+branches:
+  only:
+  - master
+
+install:
+- echo todo
+
+script:
+- exit 0
+
+cache:
+  directories:
+  - $HOME/.composer/cache/files
+  - vendor
