@@ -29,8 +29,7 @@ class JwtBearerGrant extends AbstractGrant
         ServerRequestInterface $request,
         ResponseTypeInterface $responseType,
         \DateInterval $accessTokenTTL
-    )
-    {
+    ) {
         // Validate request
         $jwt = $this->validateAssertion($request);
         $scopes = $this->validateScopes($this->getRequestParameter('scope', $request, $this->defaultScope));
