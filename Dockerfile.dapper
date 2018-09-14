@@ -1,0 +1,45 @@
+FROM mileschou/php-xdebug:7.1
+
+ENV COMPOSER_PATH /usr/local/bin/composer
+
+# Install extension
+RUN set -xe && \
+        apk add --no-cache \
+            gmp-dev \
+            libmcrypt \
+            libmcrypt-dev \
+        && \
+        docker-php-ext-install -j $(getconf _NPROCESSORS_ONLN) \
+            gmp \
+            mcrypt \
+        && \
+        php -m
+
+# Install Composer and configure
+RUN set -xe && \
+        curl -sS https://getcomposer.org/installer | php && \
+        chmod +x composer.phar && \
+        mv composer.phar ${COMPOSER_PATH} && \
+        composer --version && \
+        composer global require hirak/prestissimo && \
+        composer clear-cache
+
+ENV SOURCE_ROOT /source
+
+# Set directory
+RUN mkdir -p ${SOURCE_ROOT}
+WORKDIR ${SOURCE_ROOT}
+
+# Copy composer.json
+COPY composer.json .
+
+# Install packages without cache
+RUN set -xe && \
+        php ${COMPOSER_PATH} install && \
+        composer clear-cache
+
+# Dapper env
+ENV DAPPER_SOURCE ${SOURCE_ROOT}
+
+ENTRYPOINT ["./scripts/entry"]
+CMD ["test"]

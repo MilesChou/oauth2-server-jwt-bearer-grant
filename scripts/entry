@@ -1,0 +1,14 @@
+#!/bin/sh
+# see https://github.com/rancher/ui/tree/master/scripts
+
+set -e
+
+if [ -e ./scripts/$1 ]; then
+    ./scripts/"$@"
+else
+    exec "$@"
+fi
+
+mkdir -p build
+
+chown -R ${DAPPER_UID}:${DAPPER_GID} .
