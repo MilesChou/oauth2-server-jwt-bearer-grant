@@ -27,7 +27,6 @@ class AuthorizationServerTest extends TestCase
         // Make sure the keys have the correct permissions.
         chmod(__DIR__ . '/Stubs/private.key', 0600);
         chmod(__DIR__ . '/Stubs/public.key', 0600);
-        chmod(__DIR__ . '/Stubs/private.key.crlf', 0600);
     }
 
     public function testValidateJwtBearerGrant()
@@ -39,12 +38,11 @@ class AuthorizationServerTest extends TestCase
         $scope = new ScopeEntity();
         $scopeRepositoryMock = $this->getMockBuilder(ScopeRepositoryInterface::class)->getMock();
         $scopeRepositoryMock->method('getScopeEntityByIdentifier')->willReturn($scope);
+        $scopeRepositoryMock->method('finalizeScopes')->willReturnArgument(0);
+
 
         $accessTokenRepositoryMock = $this->getMockBuilder(AccessTokenRepositoryInterface::class)->getMock();
         $accessTokenRepositoryMock->method('getNewToken')->willReturn(new AccessTokenEntity());
-
-        $grant = new JwtBearerGrant('file://' . __DIR__ . '/Stubs/public.key');
-        $grant->setClientRepository($clientRepository);
 
         $server = new AuthorizationServer(
             $clientRepository,
@@ -53,7 +51,8 @@ class AuthorizationServerTest extends TestCase
             'file://' . __DIR__ . '/Stubs/private.key',
             'file://' . __DIR__ . '/Stubs/public.key'
         );
-        $server->enableGrantType($grant);
+
+        $server->enableGrantType(new JwtBearerGrant('file://' . __DIR__ . '/Stubs/public.key'));
 
         $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
         $_POST['assertion'] = (string)(new Builder)

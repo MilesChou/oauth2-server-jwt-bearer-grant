@@ -41,10 +41,10 @@ class JwtBearerGrant extends AbstractGrant
         );
 
         // Finalize the requested scopes
-//        $finalizedScopes = $this->scopeRepository->finalizeScopes($scopes, $this->getIdentifier(), $client);
+        $finalizedScopes = $this->scopeRepository->finalizeScopes($scopes, $this->getIdentifier(), $client);
 
         // Issue and persist access token
-        $accessToken = $this->issueAccessToken($accessTokenTTL, $client, null);
+        $accessToken = $this->issueAccessToken($accessTokenTTL, $client, null, $finalizedScopes);
 
         // Send event to emitter
         $this->getEmitter()->emit(new RequestEvent('access_token.issued', $request));
