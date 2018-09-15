@@ -2,9 +2,7 @@
 
 namespace Tests;
 
-use Lcobucci\JWT\Builder;
 use Lcobucci\JWT\Parser;
-use Lcobucci\JWT\Signer\Rsa;
 use Lcobucci\JWT\Token;
 use League\OAuth2\Server\CryptKey;
 use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
@@ -12,7 +10,6 @@ use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
 use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
 use League\OAuth2\Server\ResponseTypes\BearerTokenResponse;
 use MilesChou\OAuth2\JwtBearerGrant;
-use PHPUnit\Framework\TestCase;
 use Tests\Stubs\AccessTokenEntity;
 use Tests\Stubs\ClientEntity;
 use Tests\Stubs\ScopeEntity;
@@ -66,16 +63,7 @@ class JwtBearerGrantTest extends TestCase
         $this->target->setPublicKey('file://' . __DIR__ . '/Stubs/public.key');
 
         $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
-        $_POST['assertion'] = (string)(new Builder)
-            ->setIssuer('http://example.com')
-            ->setAudience('http://example.org')
-            ->setId('4f1g23a12aa')
-            ->setIssuedAt(time())
-            ->setNotBefore(time() + 60)
-            ->setExpiration(time() + 3600)
-            ->set('uid', 1)
-            ->sign(new Rsa\Sha256(), file_get_contents(__DIR__ . '/Stubs/private.key'))
-            ->getToken();
+        $_POST['assertion'] = $this->createAssertion();
 
         $responseType = new BearerTokenResponse();
         $responseType->setPrivateKey(new CryptKey('file://' . __DIR__ . '/Stubs/private.key'));
