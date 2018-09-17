@@ -2,12 +2,17 @@
 
 namespace MilesChou\OAuth2;
 
+use Jose\Component\Checker;
+use Jose\Component\Checker\AlgorithmChecker;
+use Jose\Component\Checker\ClaimCheckerManager;
+use Jose\Component\Checker\HeaderCheckerManager;
 use Jose\Component\Core\AlgorithmManager;
 use Jose\Component\Core\Converter\StandardConverter;
 use Jose\Component\KeyManagement\JWKFactory;
 use Jose\Component\Signature\Algorithm\ES256;
 use Jose\Component\Signature\Algorithm\HS256;
 use Jose\Component\Signature\Algorithm\RS256;
+use Jose\Component\Signature\JWSTokenSupport;
 use Jose\Component\Signature\JWSVerifier;
 use Jose\Component\Signature\Serializer\CompactSerializer;
 use Jose\Component\Signature\Serializer\JWSSerializerManager;
@@ -33,11 +38,18 @@ class JwtBearerGrant extends AbstractGrant
     private $keyFile;
 
     /**
-     * @param string|null $keyFile
+     * @var array
      */
-    public function __construct($keyFile = null)
+    private $options;
+
+    /**
+     * @param string|null $keyFile
+     * @param array $options
+     */
+    public function __construct($keyFile = null, array $options = [])
     {
         $this->setKeyFile($keyFile);
+        $this->options = $options;
     }
 
     /**
@@ -115,6 +127,17 @@ class JwtBearerGrant extends AbstractGrant
         $this->keyFile = $keyFile;
     }
 
+    /**
+     * @param string $key
+     * @param mixed $option
+     * @return static
+     */
+    public function setOption($key, $option): JwtBearerGrant
+    {
+        $this->options[$key] = $option;
+        return $this;
+    }
+
     protected function validateAssertion(ServerRequestInterface $request)
     {
         // If the client is confidential require the client secret
@@ -124,19 +147,50 @@ class JwtBearerGrant extends AbstractGrant
             throw OAuthServerException::invalidRequest('assertion');
         }
 
-        $jws = $this->resolveJwsSerializerManager()->unserialize($assertion);
+        $jwt = $this->resolveJwsSerializerManager()->unserialize($assertion);
         $jwk = JWKFactory::createFromKeyFile($this->keyFile);
 
-        if (!$this->resolveJwsVerifier()->verifyWithKey($jws, $jwk, 0)) {
-            throw new \Exception('wtf');
+        $this->resolveHeaderCheckerManager()->check($jwt, 0);
+
+        if (!$this->resolveJwsVerifier()->verifyWithKey($jwt, $jwk, 0)) {
+            throw new \Exception('JWT token is not valid');
         }
 
-        return json_decode($jws->getPayload(), true);
+        $jsonConverter = new StandardConverter();
+
+        $claims = $jsonConverter->decode($jwt->getPayload());
+
+        $this->resolveClaimCheckerManager()->check($claims);
+
+        return $claims;
     }
 
-    protected function resolveJwsVerifier(): JWSVerifier
+    protected function resolveHeaderCheckerManager(): HeaderCheckerManager
     {
-        return new JWSVerifier($this->getAlgorithmManager());
+        return HeaderCheckerManager::create([
+            new AlgorithmChecker([
+                'RS256',
+                'HS256',
+                'ES256',
+            ]),
+        ], [
+            new JWSTokenSupport(),
+        ]);
+    }
+
+    protected function resolveClaimCheckerManager(): ClaimCheckerManager
+    {
+        $checkers = [
+            new Checker\IssuedAtChecker(),
+            new Checker\NotBeforeChecker(),
+            new Checker\ExpirationTimeChecker(),
+        ];
+
+        if (isset($this->options['audience'])) {
+            $checkers[] = new Checker\AudienceChecker($this->options['audience']);
+        }
+
+        return ClaimCheckerManager::create($checkers);
     }
 
     protected function resolveJwsSerializerManager(): JWSSerializerManager
@@ -144,5 +198,10 @@ class JwtBearerGrant extends AbstractGrant
         return JWSSerializerManager::create([
             new CompactSerializer(new StandardConverter()),
         ]);
+    }
+
+    protected function resolveJwsVerifier(): JWSVerifier
+    {
+        return new JWSVerifier($this->getAlgorithmManager());
     }
 }

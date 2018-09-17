@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use Jose\Component\Checker\InvalidClaimException;
 use Jose\Component\Core\Converter\StandardConverter;
 use Jose\Component\Signature\Serializer\CompactSerializer;
 use Lcobucci\JWT\Parser;
@@ -11,6 +12,7 @@ use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
 use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
 use League\OAuth2\Server\ResponseTypes\BearerTokenResponse;
+use League\OAuth2\Server\ResponseTypes\ResponseTypeInterface;
 use MilesChou\OAuth2\JwtBearerGrant;
 use Tests\Stubs\AccessTokenEntity;
 use Tests\Stubs\ClientEntity;
@@ -113,5 +115,57 @@ class JwtBearerGrantTest extends TestCase
 
         $this->assertInstanceOf(Token::class, $jwt);
         $this->assertSame('RS256', $jwt->getHeader('alg'));
+    }
+
+    /**
+     * @test
+     */
+    public function shouldThrowExceptionWhenBadAudience()
+    {
+        $this->expectException(InvalidClaimException::class);
+
+        $this->target->setOption('audience', 'who are you');
+        $this->target->setKeyFile('file://' . __DIR__ . '/Stubs/private.key');
+        $jws = $this->createAssertion('file://' . __DIR__ . '/Stubs/private.key', 'RS256');
+
+        $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+        $_POST['assertion'] = (new CompactSerializer(new StandardConverter()))->serialize($jws);
+
+        $responseType = new BearerTokenResponse();
+        $responseType->setPrivateKey(new CryptKey('file://' . __DIR__ . '/Stubs/private.key'));
+
+        // Act
+        $this->target->respondToAccessTokenRequest(
+            ServerRequestFactory::fromGlobals(),
+            $responseType,
+            new \DateInterval('PT1H')
+        );
+    }
+
+    /**
+     * @test
+     */
+    public function shouldBeOkayWhenAudienceOk()
+    {
+        $this->target->setKeyFile('file://' . __DIR__ . '/Stubs/private.key');
+        $jws = $this->createAssertion('file://' . __DIR__ . '/Stubs/private.key', 'RS256');
+
+        // Set the audience
+        $this->target->setOption('audience', json_decode($jws->getPayload(), true)['aud']);
+
+        $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+        $_POST['assertion'] = (new CompactSerializer(new StandardConverter()))->serialize($jws);
+
+        $responseType = new BearerTokenResponse();
+        $responseType->setPrivateKey(new CryptKey('file://' . __DIR__ . '/Stubs/private.key'));
+
+        // Act
+        $responseType = $this->target->respondToAccessTokenRequest(
+            ServerRequestFactory::fromGlobals(),
+            $responseType,
+            new \DateInterval('PT1H')
+        );
+
+        $this->assertInstanceOf(ResponseTypeInterface::class, $responseType);
     }
 }

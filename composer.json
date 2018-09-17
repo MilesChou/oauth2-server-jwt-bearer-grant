@@ -11,7 +11,8 @@
     "require": {
         "php": ">=7.1",
         "web-token/jwt-signature": "^1.2",
-        "web-token/jwt-key-mgmt": "^1.2"
+        "web-token/jwt-key-mgmt": "^1.2",
+        "web-token/jwt-checker": "^1.2"
     },
     "require-dev": {
         "ext-gmp": "*",
