@@ -2,8 +2,15 @@
 
 namespace MilesChou\OAuth2;
 
-use Lcobucci\JWT\Parser;
-use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Jose\Component\Core\AlgorithmManager;
+use Jose\Component\Core\Converter\StandardConverter;
+use Jose\Component\KeyManagement\JWKFactory;
+use Jose\Component\Signature\Algorithm\ES256;
+use Jose\Component\Signature\Algorithm\HS256;
+use Jose\Component\Signature\Algorithm\RS256;
+use Jose\Component\Signature\JWSVerifier;
+use Jose\Component\Signature\Serializer\CompactSerializer;
+use Jose\Component\Signature\Serializer\JWSSerializerManager;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\Grant\AbstractGrant;
 use League\OAuth2\Server\RequestEvent;
@@ -16,16 +23,21 @@ use Psr\Http\Message\ServerRequestInterface;
 class JwtBearerGrant extends AbstractGrant
 {
     /**
-     * @var string|null
+     * @var AlgorithmManager
      */
-    private $publicKey;
+    private $algorithmManager;
 
     /**
-     * @param string|null $publicKey
+     * @var string|null
      */
-    public function __construct($publicKey = null)
+    private $keyFile;
+
+    /**
+     * @param string|null $keyFile
+     */
+    public function __construct($keyFile = null)
     {
-        $this->setPublicKey($publicKey);
+        $this->setKeyFile($keyFile);
     }
 
     /**
@@ -37,11 +49,11 @@ class JwtBearerGrant extends AbstractGrant
         \DateInterval $accessTokenTTL
     ) {
         // Validate request
-        $jwt = $this->validateAssertion($request);
+        $jws = $this->validateAssertion($request);
         $scopes = $this->validateScopes($this->getRequestParameter('scope', $request, $this->defaultScope));
 
         $client = $this->clientRepository->getClientEntity(
-            $jwt->getClaim('iss'),
+            $jws['iss'],
             $this->getIdentifier()
         );
 
@@ -61,6 +73,22 @@ class JwtBearerGrant extends AbstractGrant
     }
 
     /**
+     * @return AlgorithmManager
+     */
+    public function getAlgorithmManager(): AlgorithmManager
+    {
+        if (null === $this->algorithmManager) {
+            $this->algorithmManager = AlgorithmManager::create([
+                new RS256(),
+                new HS256(),
+                new ES256(),
+            ]);
+        }
+
+        return $this->algorithmManager;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function getIdentifier()
@@ -69,11 +97,22 @@ class JwtBearerGrant extends AbstractGrant
     }
 
     /**
-     * @param string $publicKey
+     * @param AlgorithmManager $algorithmManager
+     * @return static
      */
-    public function setPublicKey($publicKey)
+    public function setAlgorithmManager(AlgorithmManager $algorithmManager): JwtBearerGrant
     {
-        $this->publicKey = $publicKey;
+        $this->algorithmManager = $algorithmManager;
+
+        return $this;
+    }
+
+    /**
+     * @param string $keyFile
+     */
+    public function setKeyFile($keyFile)
+    {
+        $this->keyFile = $keyFile;
     }
 
     protected function validateAssertion(ServerRequestInterface $request)
@@ -85,9 +124,25 @@ class JwtBearerGrant extends AbstractGrant
             throw OAuthServerException::invalidRequest('assertion');
         }
 
-        $jwt = (new Parser)->parse($assertion);
-        $jwt->verify(new Sha256(), $this->publicKey);
+        $jws = $this->resolveJwsSerializerManager()->unserialize($assertion);
+        $jwk = JWKFactory::createFromKeyFile($this->keyFile);
 
-        return $jwt;
+        if (!$this->resolveJwsVerifier()->verifyWithKey($jws, $jwk, 0)) {
+            throw new \Exception('wtf');
+        }
+
+        return json_decode($jws->getPayload(), true);
+    }
+
+    protected function resolveJwsVerifier(): JWSVerifier
+    {
+        return new JWSVerifier($this->getAlgorithmManager());
+    }
+
+    protected function resolveJwsSerializerManager(): JWSSerializerManager
+    {
+        return JWSSerializerManager::create([
+            new CompactSerializer(new StandardConverter()),
+        ]);
     }
 }

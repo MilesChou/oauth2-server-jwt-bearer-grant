@@ -2,6 +2,8 @@
 
 namespace Tests;
 
+use Jose\Component\Core\Converter\StandardConverter;
+use Jose\Component\Signature\Serializer\CompactSerializer;
 use Lcobucci\JWT\Parser;
 use Lcobucci\JWT\Token;
 use League\OAuth2\Server\CryptKey;
@@ -58,12 +60,42 @@ class JwtBearerGrantTest extends TestCase
     /**
      * @test
      */
-    public function shouldBeOkay()
+    public function shouldBeOkayWithEs256()
     {
-        $this->target->setPublicKey('file://' . __DIR__ . '/Stubs/public.key');
+        $this->target->setKeyFile('file://' . __DIR__ . '/Stubs/es256-private.key');
+        $jws = $this->createAssertion('file://' . __DIR__ . '/Stubs/es256-private.key', 'ES256');
 
         $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
-        $_POST['assertion'] = $this->createAssertion();
+        $_POST['assertion'] = (new CompactSerializer(new StandardConverter()))->serialize($jws);
+
+        $responseType = new BearerTokenResponse();
+        $responseType->setPrivateKey(new CryptKey('file://' . __DIR__ . '/Stubs/private.key'));
+
+        $responseType = $this->target->respondToAccessTokenRequest(
+            ServerRequestFactory::fromGlobals(),
+            $responseType,
+            new \DateInterval('PT1H')
+        );
+
+        $response = $responseType->generateHttpResponse(new Response());
+
+        $json = json_decode($response->getBody(), true);
+        $jwt = (new Parser)->parse($json['access_token']);
+
+        $this->assertInstanceOf(Token::class, $jwt);
+        $this->assertSame('RS256', $jwt->getHeader('alg'));
+    }
+
+    /**
+     * @test
+     */
+    public function shouldBeOkayWithRs256()
+    {
+        $this->target->setKeyFile('file://' . __DIR__ . '/Stubs/private.key');
+        $jws = $this->createAssertion('file://' . __DIR__ . '/Stubs/private.key', 'RS256');
+
+        $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+        $_POST['assertion'] = (new CompactSerializer(new StandardConverter()))->serialize($jws);
 
         $responseType = new BearerTokenResponse();
         $responseType->setPrivateKey(new CryptKey('file://' . __DIR__ . '/Stubs/private.key'));

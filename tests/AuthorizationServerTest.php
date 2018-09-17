@@ -2,6 +2,8 @@
 
 namespace Tests;
 
+use Jose\Component\Core\Converter\StandardConverter;
+use Jose\Component\Signature\Serializer\CompactSerializer;
 use Lcobucci\JWT\Parser;
 use Lcobucci\JWT\Token;
 use League\OAuth2\Server\AuthorizationServer;
@@ -35,7 +37,6 @@ class AuthorizationServerTest extends TestCase
         $scopeRepositoryMock->method('getScopeEntityByIdentifier')->willReturn($scope);
         $scopeRepositoryMock->method('finalizeScopes')->willReturnArgument(0);
 
-
         $accessTokenRepositoryMock = $this->getMockBuilder(AccessTokenRepositoryInterface::class)->getMock();
         $accessTokenRepositoryMock->method('getNewToken')->willReturn(new AccessTokenEntity());
 
@@ -49,8 +50,10 @@ class AuthorizationServerTest extends TestCase
 
         $server->enableGrantType(new JwtBearerGrant('file://' . __DIR__ . '/Stubs/public.key'));
 
+        $jws = $this->createAssertion('file://' . __DIR__ . '/Stubs/private.key', 'RS256');
+
         $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
-        $_POST['assertion'] = $this->createAssertion();
+        $_POST['assertion'] = (new CompactSerializer(new StandardConverter()))->serialize($jws);
 
         $response = $server->respondToAccessTokenRequest(ServerRequestFactory::fromGlobals(), new Response);
 
@@ -85,13 +88,12 @@ class AuthorizationServerTest extends TestCase
 
         $server->enableGrantType(new JwtBearerGrant('file://' . __DIR__ . '/Stubs/es256-public.key'));
 
-        $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
-        $_POST['assertion'] = $this->createAssertion();
+        $jws = $this->createAssertion('file://' . __DIR__ . '/Stubs/es256-private.key', 'ES256');
 
-        $this->markTestIncomplete();
+        $_POST['grant_type'] = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+        $_POST['assertion'] = (new CompactSerializer(new StandardConverter()))->serialize($jws);
 
         $response = $server->respondToAccessTokenRequest(ServerRequestFactory::fromGlobals(), new Response);
-
 
         $json = json_decode($response->getBody(), true);
         $jwt = (new Parser)->parse($json['access_token']);

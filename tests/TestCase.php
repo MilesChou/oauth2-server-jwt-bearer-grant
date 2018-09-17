@@ -2,25 +2,47 @@
 
 namespace Tests;
 
-use Lcobucci\JWT\Builder;
-use Lcobucci\JWT\Signer\Rsa;
+use Jose\Component\Core\AlgorithmManager;
+use Jose\Component\Core\Converter\StandardConverter;
+use Jose\Component\KeyManagement\JWKFactory;
+use Jose\Component\Signature\Algorithm\ES256;
+use Jose\Component\Signature\Algorithm\HS256;
+use Jose\Component\Signature\Algorithm\RS256;
+use Jose\Component\Signature\JWS;
+use Jose\Component\Signature\JWSBuilder;
 
 class TestCase extends \PHPUnit\Framework\TestCase
 {
-    /**
-     * @return string
-     */
-    protected function createAssertion()
+    protected function createAssertion($keyFile, $alg): JWS
     {
-        return (string)(new Builder)
-            ->setIssuer('http://example.com')
-            ->setAudience('http://example.org')
-            ->setId('4f1g23a12aa')
-            ->setIssuedAt(time())
-            ->setNotBefore(time() + 60)
-            ->setExpiration(time() + 3600)
-            ->set('uid', 1)
-            ->sign(new Rsa\Sha256(), file_get_contents(__DIR__ . '/Stubs/private.key'))
-            ->getToken();
+        // The algorithm manager with the HS256 algorithm.
+        $algorithmManager = AlgorithmManager::create([
+            new HS256(),
+            new RS256(),
+            new ES256(),
+        ]);
+
+        $jwk = JWKFactory::createFromKeyFile($keyFile);
+
+        $jsonConverter = new StandardConverter();
+
+        $jwsBuilder = new JWSBuilder(
+            $jsonConverter,
+            $algorithmManager
+        );
+
+        $payload = $jsonConverter->encode([
+            'iat' => time(),
+            'nbf' => time(),
+            'exp' => time() + 3600,
+            'iss' => 'My service',
+            'aud' => 'Your app',
+        ]);
+
+        return $jwsBuilder
+            ->create()
+            ->withPayload($payload)
+            ->addSignature($jwk, ['alg' => $alg])
+            ->build();
     }
 }
